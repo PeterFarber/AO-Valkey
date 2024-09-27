@@ -1,0 +1,3 @@
+[submodule "aos"]
+	path = aos
+	url = git@github.com:permaweb/aos.git

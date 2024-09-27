@@ -1,0 +1,9 @@
+aos
+AOValkey/build
+libs/*
+RediSearch
+RedisJSON
+tests/process.js
+tests/process.wasm
+valkey
+.vscode

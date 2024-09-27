@@ -1,0 +1,150 @@
+#!/bin/bash
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+BUILD_JSON=${1:-1}
+BUILD_SEARCH=${2:-1}
+BUILD_VALKEY=${3:-1}
+
+CLONE_JSON=0
+CLONE_SEARCH=0
+CLONE_VALKEY=0
+
+echo "Building Valkey: ${BUILD_VALKEY}"
+echo "Building RedisJSON: ${BUILD_JSON}"
+echo "Building RediSearch: ${BUILD_SEARCH}"
+
+VALKEY_DIR="${SCRIPT_DIR}/valkey"
+REDISJSON_DIR="${SCRIPT_DIR}/RedisJSON"
+REDISEARCH_DIR="${SCRIPT_DIR}/RediSearch"
+AOVALKEY_DIR="${SCRIPT_DIR}/AOValkey"
+
+BUILD_DIR="${SCRIPT_DIR}/build"
+LIBS_DIR="${BUILD_DIR}/libs"
+INJECT_DIR="${SCRIPT_DIR}/inject"
+
+AO_IMAGE="ao32:latest"
+
+# EMXX_CFLAGS=" -s EXPORT_ALL=1 -s EXPORT_ES6=1 -Wno-unused-command-line-argument -Wno-experimental /lua-5.3.4/src/liblua.a -I/lua-5.3.4/src"
+EMXX_CFLAGS="/lua-5.3.4/src/liblua.a -I/lua-5.3.4/src -I/jolt/ -I/jolt/Jolt -s SUPPORT_LONGJMP=1"
+
+# Clone valkey if it doesn't exist
+if [ "$BUILD_VALKEY" -eq 1 ]; then
+	if [ "$CLONE_VALKEY" -eq 1 ]; then
+		sudo rm -rf ${VALKEY_DIR}
+		if [ ! -d "$VALKEY_DIR" ]; then
+			git clone https://github.com/valkey-io/valkey.git valkey
+			cd ${VALKEY_DIR} && git checkout 8.0
+			cp -a ${INJECT_DIR}/. ${VALKEY_DIR}/
+		fi
+		cd ${SCRIPT_DIR}
+		sudo chmod -R 777 ${VALKEY_DIR}
+	fi
+
+fi
+
+# Clone REDISJSON
+if [ "$BUILD_JSON" -eq 1 ]; then
+	if [ "$CLONE_JSON" -eq 1 ]; then
+		sudo rm -rf ${REDISJSON_DIR}
+		if [ ! -d "$REDISJSON_DIR" ]; then
+			git clone https://github.com/RedisJSON/RedisJSON.git RedisJSON
+			cd ${REDISJSON_DIR} && git checkout tags/v2.8.4 -b v2.8.4
+			git submodule update --init --recursive
+		fi
+		sudo chmod -R 777 ${REDISJSON_DIR}
+	fi
+	# Build RedisJSON
+	cd ${REDISJSON_DIR}
+	cargo build --release
+	cd ${SCRIPT_DIR}
+fi
+
+# Clone RediSearch
+if [ "$BUILD_SEARCH" -eq 1 ]; then
+	if [ "$CLONE_SEARCH" -eq 1 ]; then
+		sudo rm -rf ${REDISEARCH_DIR}
+		if [ ! -d "$REDISEARCH_DIR" ]; then
+			git clone https://github.com/RediSearch/RediSearch.git RediSearch
+			cd ${REDISEARCH_DIR} && git checkout tags/v2.10.7 -b v2.10.7
+			git submodule update --init --recursive
+		fi
+		sudo chmod -R 777 ${REDISEARCH_DIR}
+	fi
+	# Build RediSearch
+	cd ${REDISEARCH_DIR}
+	sudo make setup
+	sudo make build
+	cd ${SCRIPT_DIR}
+fi
+
+
+
+
+
+
+
+# # Build jolt into a static library with emscripten
+# docker run -v ${JOLT_DIR}:/jolt --platform linux/amd64 ${AO_IMAGE}  sh -c \
+# 		"cd /jolt && emcmake cmake -S . -B ."
+
+# docker run -v ${JOLT_DIR}:/jolt --platform linux/amd64  ${AO_IMAGE} sh -c \
+# 		"cd /jolt && cmake --build ." 
+
+# # Fix permissions
+# sudo chmod -R 777 ${JOLT_DIR}
+
+
+# # Build lua jolt into a static library with emscripten
+# rm -rf ${AOP_DIR}/build
+# docker run -v ${AOP_DIR}:/AOP -v ${JOLT_DIR}:/jolt --platform linux/amd64 ${AO_IMAGE}  sh -c \
+# 		"cd /AOP && mkdir build && cd build && emcmake cmake -DCMAKE_CXX_FLAGS='${EMXX_CFLAGS}' -S .. -B ."
+
+# docker run -v ${AOP_DIR}:/AOP -v ${JOLT_DIR}:/jolt --platform linux/amd64  ${AO_IMAGE} sh -c \
+# 		"cd /AOP/build && cmake --build ." 
+
+# docker run -v ${LUA_JOLT_DIR}:/lua_jolt ${AO_IMAGE} sh -c \
+# 		"cd /lua_jolt/build && emar rcs lJolt2.a lJolt.a"
+
+
+# Fix permissions
+
+
+# # Build ljolt into a library with emscripten
+# docker run -v ${LUA_JOLT_DIR}:/lua_jolt -v ${JOLT_DIR}:/jolt ${AO_IMAGE} sh -c \
+# 		"cd /lua_jolt && emcc -s -c l_jolt.c -o l_jolt.o -I/usr/include/**/* /lua-5.3.4/src/liblua.a -I/lua-5.3.4/src -I/jolt/ /jolt/libJolt.a -I/jolt/Jolt && emar rcs l_jolt.a l_jolt.o && rm l_jolt.o"
+
+# Fix permissions
+
+
+# # Copy jolt to the libs directory
+# rm -rf ${BUILD_DIR}
+# mkdir -p $LIBS_DIR
+# cp ${JOLT_DIR}/libJolt.a $LIBS_DIR/libJolt.a
+# cp ${AOP_DIR}/build/libaop.a $LIBS_DIR/libaop.a
+# cp -r ${AOP_DIR}/Lua/. ${BUILD_DIR}/
+
+# cp -r ${LIBS_DIR} ${PROCESS_DIR}
+
+# # Copy config.yml to the process directory
+# cp ${SCRIPT_DIR}/config.yml ${PROCESS_DIR}/config.yml
+# cp -r ${AOP_DIR}/Lua/. ${PROCESS_DIR}/
+
+# # Build the process module
+# cd ${PROCESS_DIR} 
+# docker run -e DEBUG=1 --platform linux/amd64 -v ./:/src ${AO_IMAGE} ao-build-module
+
+# # # Copy the process module to the tests directory
+# cp ${PROCESS_DIR}/process.wasm ${SCRIPT_DIR}/tests/process.wasm
+# cp ${PROCESS_DIR}/process.wasm ${SCRIPT_DIR}/tests-loader/process.wasm
+# cp ${PROCESS_DIR}/process.js ${SCRIPT_DIR}/tests/process.js
+
+# rm -rf ${SCRIPT_DIR}/tests/Lua
+# cp -r ${AOP_DIR}/Lua/ ${SCRIPT_DIR}/tests/Lua/
+# cp -r ${AOP_DIR}/Lua/ ${PROCESS_DIR}
+# apt-get -y install --no-install-recommends llvm-dev libclang-dev librocksdb-dev clang
+# git clone https://github.com/emscripten-core/emsdk.git /emsdk
+# cd /emsdk
+# git pull
+# ./emsdk install 3.1.59
+# ./emsdk activate 3.1.59
+#  source "/emsdk/emsdk_env.sh"
